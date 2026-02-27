@@ -25,11 +25,10 @@ import re
 from typing import List
 
 import google.generativeai as genai
+from google.api_core.exceptions import ResourceExhausted
 from google.generativeai.types import HarmBlockThreshold, HarmCategory
 
 from models import (
-    DamageType,
-    Detection,
     LLMResult,
     PartDecision,
     PerceptionResult,
@@ -39,8 +38,8 @@ from models import (
 logger = logging.getLogger(__name__)
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-GEMINI_MODEL = "gemini-1.5-pro"
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyBKy1ndo0KGBP-g3hgCHwzqnrqJyrlPNy0")
 
 # Severity threshold above which REPLACE is mandated regardless of LLM
 SEVERITY_REPLACE_THRESHOLD = 4
@@ -48,71 +47,68 @@ SEVERITY_REPLACE_THRESHOLD = 4
 # ── System Prompt ─────────────────────────────────────────────────────────────
 SYSTEM_PROMPT = """
 You are a certified vehicle damage assessment analyst for an Indian motor insurance company.
+You are powered by the Gemini 2.5 Flash vision model logic engine.
 
-You will be given:
-1. A normalized photograph of a damaged vehicle
-2. A list of detected damaged parts with bounding boxes and damage types (from computer vision)
-3. Point of Impact (POI) information from the CV pipeline
-
-Your ONLY job is to assess repair vs. replacement decisions for each detected part.
+1. The Visual Extraction (The "Eyes"):
+   Look VERY CLOSELY for all types of damage in the image (abnormalities in the surface, paint, structure, or glass). Do not ignore minor scratches.
+2. The Part Identification:
+   Logically map the visual anomaly to the corresponding car part (e.g., "Front Bumper," "Left Headlight," "Hood").
+3. The Severity Logic Engine:
+   Categorize the visual damage into these severity bins (Map to a 1-6 scale):
+   - "Minor" (Scores 1-2): superficial clear coat scratches or tiny dings that do not break the paint surface.
+   - "Moderate" (Scores 3-4): deep scratches that go through the paint layer, visible creases, medium-to-large dents, and scuffed bumper plastic. (Be highly sensitive to these and flag them!).
+   - "Severe" (Scores 5-6): shattered glass, completely crushed or folded panels, tears in the metal/plastic, or severe structural frame misalignment requiring absolute replacement.
+4. Mathematical Coordinate Mapping:
+   Provide the exact (X, Y) coordinate percentages for the center of every single damage item it finds.
+   - x_percentage: (0-100) from the left edge of the image.
+   - y_percentage: (0-100) from the top edge of the image.
+5. Repair vs. Replace Logic:
+   - "REPAIR": Can it be pulled, filled, and repainted?
+   - "REPLACE": Is it shattered, torn, or structurally compromised?
 
 STRICT OUTPUT RULES:
-- Output ONLY a valid JSON array — no markdown, no explanation, no preamble
+- Output ONLY a valid JSON array — no markdown, no explanation, no preamble.
 - Each element must have EXACTLY these fields:
   {
-    "part": "<exact part label from the provided list>",
-    "part_key": "<exact part_key from the provided list>",
+    "part": "<Name of the vehicle part, e.g. Front Bumper>",
+    "part_key": "<snake_case version of the part name, e.g. front_bumper>",
     "decision": "REPAIR" or "REPLACE",
-    "severity_score": <integer 1 to 6>,
-    "justification": "<single sentence, max 25 words, technical language>"
+    "severity_score": <integer 1 to 6 mapped from the Severity Logic Engine>,
+    "justification": "<single sentence explanation matching the logic rules>",
+    "x_percentage": <float 0-100>,
+    "y_percentage": <float 0-100>
   }
-- DO NOT invent parts that are not in the provided detection list
-- DO NOT output prices, costs, or any monetary values
-- DO NOT add any field other than the five specified above
-- severity_score 1-3 → prefer REPAIR; severity_score 4-6 → prefer REPLACE
-- A crack or deformation with severity ≥ 4 MUST be REPLACE
-
-Severity Scale:
-  1 = Cosmetic scratch, no structural damage
-  2 = Light surface damage, paint affected
-  3 = Moderate dent or scratch, panel deformed
-  4 = Significant crack or deep dent, structural concern
-  5 = Severe damage, part non-functional
-  6 = Catastrophic damage or safety hazard
+- DO NOT output prices.
 """
 
 
 # ── Public Entry Point ────────────────────────────────────────────────────────
 
 def reason_repairs(
-    detections: List[Detection],
     perception: PerceptionResult,
 ) -> LLMResult:
     """
-    Send normalized image + detection context to Gemini 1.5 Pro Vision.
-    Returns validated LLMResult with per-part repair decisions.
-
-    Falls back to heuristic-only decisions if API key is missing or API fails.
+    Send normalized image + CV context to Gemini 2.5 Flash.
+    Returns validated LLMResult with per-part repair decisions + coords.
     """
     if not GEMINI_API_KEY:
-        logger.warning(
-            "GEMINI_API_KEY not set — using heuristic fallback for repair decisions."
+        logger.error(
+            "GEMINI_API_KEY not set — cannot perform AI reasoning."
         )
-        return _heuristic_fallback(detections)
+        raise ValueError("GEMINI_API_KEY required for AI analysis.")
 
     genai.configure(api_key=GEMINI_API_KEY)
 
     try:
-        return _call_gemini(detections, perception)
+        return _call_gemini(perception)
     except Exception as exc:
-        logger.error(f"Gemini API call failed: {exc} — falling back to heuristics.")
-        return _heuristic_fallback(detections)
+        logger.error(f"Gemini API call failed: {exc}")
+        raise exc
 
 
 # ── Gemini API Call ───────────────────────────────────────────────────────────
 
 def _call_gemini(
-    detections: List[Detection],
     perception: PerceptionResult,
 ) -> LLMResult:
     """Construct prompt, call Gemini, parse and validate response."""
@@ -121,8 +117,7 @@ def _call_gemini(
         system_instruction=SYSTEM_PROMPT,
     )
 
-    # Build detection context for the prompt
-    detection_context = _build_detection_context(detections, perception)
+    # Remove detection_context entirely
 
     # Build image part from base64
     image_part = {
@@ -138,31 +133,56 @@ Image metrics: brightness={perception.image_metrics.brightness},
                blur_score={perception.image_metrics.blur_score:.1f},
                contrast={perception.image_metrics.contrast_score}
 
-Detected damaged parts (from computer vision — you must ONLY assess these):
-{detection_context}
-
-Output the JSON array assessment for each part listed above.
+Output the JSON array assessment outlining the damages.
 """
 
-    response = model.generate_content(
-        contents=[image_part, user_message],
-        generation_config=genai.types.GenerationConfig(
-            temperature=0.1,      # Near-deterministic for structured output
-            top_p=0.9,
-            max_output_tokens=2048,
-            response_mime_type="application/json",
-        ),
-        safety_settings={
-            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-        },
-    )
+    try:
+        response = model.generate_content(
+            contents=[image_part, user_message],
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.1,      # Near-deterministic for structured output
+                top_p=0.9,
+                max_output_tokens=8192,
+                response_mime_type="application/json",
+            ),
+            safety_settings={
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+            },
+        )
+    except ResourceExhausted:
+        logger.warning("Gemini API Rate Limit Exceeded (429). Using mock fallback data.")
+        mock_decisions = [
+            PartDecision(
+                part="Front Bumper",
+                part_key="front_bumper",
+                decision=RepairDecision("REPLACE"),
+                severity_score=5,
+                justification="Mock analysis: Severe structural damage detected (Rate limit exceeded for real analysis).",
+                x_percentage=50.0,
+                y_percentage=75.0,
+            ),
+            PartDecision(
+                part="Left Headlight",
+                part_key="left_headlight",
+                decision=RepairDecision("REPLACE"),
+                severity_score=6,
+                justification="Mock analysis: Shattered lens and housing (Rate limit exceeded for real analysis).",
+                x_percentage=25.0,
+                y_percentage=60.0,
+            )
+        ]
+        return LLMResult(
+            decisions=mock_decisions,
+            model_used="gemini-mock-fallback",
+            prompt_tokens=0,
+        )
 
     raw_text = response.text.strip()
     logger.debug(f"Gemini raw response: {raw_text[:500]}")
 
     # Parse and validate
-    decisions = _parse_and_validate(raw_text, detections)
+    decisions = _parse_and_validate(raw_text)
 
     # Token usage if available
     prompt_tokens = None
@@ -178,37 +198,14 @@ Output the JSON array assessment for each part listed above.
     )
 
 
-# ── Prompt Construction ───────────────────────────────────────────────────────
-
-def _build_detection_context(
-    detections: List[Detection], perception: PerceptionResult
-) -> str:
-    """Build a numbered list of detections for the LLM prompt."""
-    lines = []
-    for i, det in enumerate(detections, 1):
-        lines.append(
-            f'{i}. part="{det.part}" | part_key="{det.part_key}" | '
-            f'damage_type="{det.damage_type.value}" | '
-            f'confidence={det.confidence:.2f} | '
-            f'area_px={det.area_px}'
-        )
-    return "\n".join(lines)
-
-
 # ── Response Parsing & Validation ─────────────────────────────────────────────
 
 def _parse_and_validate(
-    raw_text: str, detections: List[Detection]
+    raw_text: str
 ) -> List[PartDecision]:
     """
-    Parse LLM JSON output and validate:
-    - Only parts present in detections are accepted
-    - Severity and decision consistency
-    - Missing parts get heuristic fallback entry
+    Parse LLM JSON output and validate fields.
     """
-    allowed_keys = {d.part_key for d in detections}
-    key_to_detection = {d.part_key: d for d in detections}
-
     # Strip markdown code blocks if present
     cleaned = re.sub(r"```(?:json)?", "", raw_text).strip()
     if cleaned.startswith("["):
@@ -221,123 +218,35 @@ def _parse_and_validate(
     try:
         raw_list = json.loads(json_text)
     except json.JSONDecodeError as e:
-        logger.warning(f"JSON parse error: {e} — using heuristic fallback.")
-        return _heuristic_decisions(detections)
+        logger.error(f"JSON parse error: {e}")
+        raise ValueError(f"Failed to parse LLM output: {e}\nRaw: {raw_text}")
 
     decisions = []
-    seen_keys = set()
 
     for item in raw_list:
-        part_key = item.get("part_key", "")
-        if part_key not in allowed_keys:
-            logger.warning(f"LLM invented or misidentified part '{part_key}' — skipping.")
-            continue
-
-        det = key_to_detection[part_key]
         severity = int(item.get("severity_score", 3))
         severity = max(1, min(6, severity))
         decision_str = str(item.get("decision", "REPAIR")).upper()
 
-        # Enforce the severity → decision rule
-        if severity >= SEVERITY_REPLACE_THRESHOLD and det.damage_type in (
-            DamageType.CRACK, DamageType.DEFORMATION
-        ):
-            decision_str = "REPLACE"
-
-        try:
-            decision = RepairDecision(decision_str)
-        except ValueError:
-            decision = RepairDecision.REPAIR
+        if decision_str not in ("REPAIR", "REPLACE"):
+            decision_str = "REPAIR"
+            
+        decision = RepairDecision(decision_str)
+        
+        # fallback default mapped to center of image if missing
+        x_pct = float(item.get("x_percentage", 50.0))
+        y_pct = float(item.get("y_percentage", 50.0))
 
         decisions.append(
             PartDecision(
-                part=item.get("part", det.part),
-                part_key=part_key,
+                part=item.get("part", "Unknown Part"),
+                part_key=item.get("part_key", "unknown"),
                 decision=decision,
                 severity_score=severity,
                 justification=item.get("justification", "Assessment based on visual damage pattern.")[:200],
-                damage_type=det.damage_type,
+                x_percentage=x_pct,
+                y_percentage=y_pct,
             )
         )
-        seen_keys.add(part_key)
-
-    # For any detected part the LLM omitted — apply heuristic
-    for det in detections:
-        if det.part_key not in seen_keys:
-            logger.warning(
-                f"LLM omitted '{det.part_key}' — applying heuristic decision."
-            )
-            decisions.append(_heuristic_single(det))
 
     return decisions
-
-
-# ── Heuristic Fallback ────────────────────────────────────────────────────────
-
-def _heuristic_fallback(detections: List[Detection]) -> LLMResult:
-    """
-    Deterministic repair/replace decisions when LLM is unavailable.
-    Based on damage type + confidence score — no random values.
-    """
-    decisions = [_heuristic_single(d) for d in detections]
-    return LLMResult(
-        decisions=decisions,
-        model_used="heuristic-fallback",
-        prompt_tokens=None,
-    )
-
-
-def _heuristic_single(det: Detection) -> PartDecision:
-    """
-    Deterministic decision for one detection.
-    Rules:
-      Crack + confidence > 0.65 → REPLACE, severity 5
-      Crack + confidence <= 0.65 → REPLACE, severity 4
-      Deformation             → REPLACE, severity 5
-      Dent + confidence > 0.70 → REPLACE, severity 4
-      Dent + confidence <= 0.70 → REPAIR, severity 3
-      Scratch                  → REPAIR, severity 2
-      Paint Damage             → REPAIR, severity 2
-      Unknown                  → REPAIR, severity 2
-    """
-    d = det.damage_type
-    conf = det.confidence
-
-    if d == DamageType.CRACK:
-        severity = 5 if conf > 0.65 else 4
-        decision = RepairDecision.REPLACE
-        justification = "Crack detected with structural implication — replacement required."
-    elif d == DamageType.DEFORMATION:
-        severity = 5
-        decision = RepairDecision.REPLACE
-        justification = "Deformation exceeds geometric repair tolerance."
-    elif d == DamageType.DENT:
-        if conf > 0.70:
-            severity = 4
-            decision = RepairDecision.REPLACE
-            justification = "Deep dent detected with high confidence — replacement recommended."
-        else:
-            severity = 3
-            decision = RepairDecision.REPAIR
-            justification = "Moderate dent within panel repair threshold."
-    elif d == DamageType.SCRATCH:
-        severity = 2
-        decision = RepairDecision.REPAIR
-        justification = "Surface scratch — sanding and repainting sufficient."
-    else:
-        severity = 2
-        decision = RepairDecision.REPAIR
-        justification = "Minor damage — repair viable based on visual assessment."
-
-    return PartDecision(
-        part=det.part,
-        part_key=det.part_key,
-        decision=decision,
-        severity_score=severity,
-        justification=justification,
-        damage_type=det.damage_type,
-    )
-
-
-def _heuristic_decisions(detections: List[Detection]) -> List[PartDecision]:
-    return [_heuristic_single(d) for d in detections]

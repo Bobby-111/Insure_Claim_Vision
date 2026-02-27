@@ -1,24 +1,25 @@
-// components/DetectionOverlay.tsx — Canvas bounding box overlay on original image
+// components/DetectionOverlay.tsx — Canvas overlay to render Gemini coordinates
 
 import { useEffect, useRef } from 'react'
-import type { Detection } from '../types/claim'
+import { ScanSearch } from 'lucide-react'
+import { motion } from 'framer-motion'
+import type { PartDecision } from '../types/claim'
 
 interface Props {
-  imageFile: File
-  detections: Detection[]
-  imageShape: [number, number]  // [height, width]
+  imageFile?: File | null
+  decisions?: PartDecision[]
 }
 
-const DAMAGE_COLORS: Record<string, string> = {
-  Crack: '#ef4444',
-  Dent: '#f59e0b',
-  Scratch: '#3b82f6',
-  Deformation: '#8b5cf6',
-  'Paint Damage': '#06b6d4',
-  Unknown: '#6b7280',
+const SEVERITY_COLORS: Record<number, string> = {
+  1: '#3b82f6', // Minor - Blue
+  2: '#0ea5e9', // Minor - Light Blue
+  3: '#f59e0b', // Moderate - Amber
+  4: '#ea580c', // Moderate - Orange
+  5: '#ef4444', // Severe - Red
+  6: '#b91c1c', // Severe - Dark Red
 }
 
-export default function DetectionOverlay({ imageFile, detections, imageShape }: Props) {
+export default function DetectionOverlay({ imageFile, decisions = [] }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const imgRef = useRef<HTMLImageElement | null>(null)
 
@@ -30,113 +31,125 @@ export default function DetectionOverlay({ imageFile, detections, imageShape }: 
     if (!ctx) return
 
     const img = new Image()
-    img.src = URL.createObjectURL(imageFile)
+    if (imageFile) {
+      img.src = URL.createObjectURL(imageFile)
+    }
     imgRef.current = img
 
     img.onload = () => {
-      const [imgH, imgW] = imageShape
-      canvas.width = img.naturalWidth || imgW
-      canvas.height = img.naturalHeight || imgH
+      canvas.width = img.naturalWidth
+      canvas.height = img.naturalHeight
 
       // Draw original image
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
-      // Scale factors (canvas vs model inference size)
-      const scaleX = canvas.width / imgW
-      const scaleY = canvas.height / imgH
+      // Draw each detection dot
+      decisions.forEach((dec) => {
+        const cx = (dec.x_percentage / 100) * canvas.width
+        const cy = (dec.y_percentage / 100) * canvas.height
 
-      // Draw each detection bounding box
-      detections.forEach((det) => {
-        const [x1, y1, x2, y2] = det.bbox
-        const sx1 = x1 * scaleX
-        const sy1 = y1 * scaleY
-        const sw = (x2 - x1) * scaleX
-        const sh = (y2 - y1) * scaleY
+        const color = SEVERITY_COLORS[dec.severity_score] ?? '#94a3b8'
 
-        const color = DAMAGE_COLORS[det.damage_type] ?? '#6b7280'
+        // Draw a simulated bounding box around the center coordinate
+        // (Assuming an average size of ~12% of the image size)
+        const boxSize = Math.max(canvas.width, canvas.height) * 0.12
+        const sx1 = cx - boxSize / 2
+        const sy1 = cy - boxSize / 2
 
-        // Bounding box
+        // Bounding box outline
         ctx.strokeStyle = color
-        ctx.lineWidth = 2.5
-        ctx.strokeRect(sx1, sy1, sw, sh)
+        ctx.lineWidth = 3
+        ctx.strokeRect(sx1, sy1, boxSize, boxSize)
 
         // Semi-transparent fill
-        ctx.fillStyle = color + '20'
-        ctx.fillRect(sx1, sy1, sw, sh)
-
-        // Label
-        const label = `${det.part} · ${det.damage_type} (${(det.confidence * 100).toFixed(0)}%)`
-        const fontSize = Math.max(11, Math.min(14, canvas.width / 60))
-        ctx.font = `bold ${fontSize}px Inter, system-ui`
-        const textW = ctx.measureText(label).width
-        const padX = 6
-        const padY = 4
-        const labelH = fontSize + padY * 2
-
-        // Label background
-        ctx.fillStyle = color + 'ee'
-        const labelY = sy1 - labelH > 0 ? sy1 - labelH : sy1 + sh + 2
-        ctx.fillRect(sx1, labelY, textW + padX * 2, labelH)
-
-        // Label text
-        ctx.fillStyle = '#ffffff'
-        ctx.fillText(label, sx1 + padX, labelY + labelH - padY - 1)
+        ctx.fillStyle = color + '25'
+        ctx.fillRect(sx1, sy1, boxSize, boxSize)
       })
     }
-  }, [imageFile, detections, imageShape])
+  }, [imageFile, decisions])
 
   return (
-    <div className="glass-card-elevated overflow-hidden animate-slide-up">
-      <div className="flex items-center gap-3 p-4 border-b border-white/10">
-        <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center text-orange-400">
-          🎯
-        </div>
-        <div>
-          <h3 className="font-medium text-sm text-white">YOLO Detection Overlay</h3>
-          <p className="text-xs text-slate-500">
-            {detections.length} part{detections.length !== 1 ? 's' : ''} detected
-          </p>
+    <motion.div
+      className="bg-gray-800/40 h-full overflow-hidden flex flex-col shadow-xl border border-gray-700 rounded-3xl"
+    >
+      <div className="flex flex-col border-b border-gray-700 bg-gray-900/50">
+        <div className="flex items-center gap-4 p-5">
+          <div className="w-10 h-10 rounded-xl bg-indigo-900/40 flex items-center justify-center text-indigo-400 shadow-sm border border-indigo-500/30">
+            <ScanSearch className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="font-bold text-[14px] text-white tracking-tight">Gemini Vision Mapping</h3>
+            {decisions.length > 0 ? (
+              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mt-0.5">
+                {decisions.length} part{decisions.length !== 1 ? 's' : ''} analyzed
+              </p>
+            ) : (
+              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-widest mt-0.5">
+                Pending Analysis
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Legend */}
-      <div className="flex flex-wrap gap-2 px-4 py-3 border-b border-white/5">
-        {Object.entries(DAMAGE_COLORS).map(([type, color]) => (
-          <div key={type} className="flex items-center gap-1.5 text-xs text-slate-400">
-            <span className="w-3 h-3 rounded-sm inline-block" style={{ backgroundColor: color }} />
-            {type}
-          </div>
-        ))}
+      <div className="flex flex-wrap gap-x-4 gap-y-2 px-5 py-3 border-b border-gray-700 bg-gray-800/80">
+        <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+          <span className="w-2.5 h-2.5 rounded-[3px] inline-block shadow-sm" style={{ backgroundColor: SEVERITY_COLORS[2] }} />
+          Minor
+        </div>
+        <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+          <span className="w-2.5 h-2.5 rounded-[3px] inline-block shadow-sm" style={{ backgroundColor: SEVERITY_COLORS[4] }} />
+          Moderate
+        </div>
+        <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+          <span className="w-2.5 h-2.5 rounded-[3px] inline-block shadow-sm" style={{ backgroundColor: SEVERITY_COLORS[6] }} />
+          Severe
+        </div>
       </div>
 
       {/* Canvas */}
-      <div className="bg-dark-900 flex items-center justify-center p-2">
-        <canvas
-          ref={canvasRef}
-          className="max-w-full max-h-72 rounded-lg object-contain"
-        />
+      <div className="bg-gray-900/50 flex-1 flex items-center justify-center p-3 relative mix-blend-screen">
+        <div className="absolute inset-0 pattern-grid-lg text-white/5 [mask-image:linear-gradient(to_bottom,white,transparent)]" />
+        {imageFile ? (
+          <canvas
+            ref={canvasRef}
+            className="max-w-full max-h-72 rounded-xl object-contain shadow-sm border border-gray-700 bg-black relative z-10"
+          />
+        ) : (
+          <div className="absolute inset-0 flex items-center justify-center text-gray-500 text-[13px] font-bold z-10">
+            Awaiting original image mapping
+          </div>
+        )}
       </div>
 
       {/* Detection List */}
-      {detections.length > 0 && (
-        <div className="divide-y divide-white/5">
-          {detections.map((det, idx) => (
-            <div key={idx} className="flex items-center justify-between px-4 py-2.5">
-              <div className="flex items-center gap-2.5">
+      {decisions.length > 0 && (
+        <div className="divide-y divide-gray-700 bg-gray-800/80 max-h-48 overflow-y-auto custom-scrollbar border-t border-gray-700">
+          {decisions.map((dec, idx) => (
+            <div key={idx} className="flex items-center justify-between px-5 py-3 hover:bg-gray-700/50 transition-colors">
+              <div className="flex items-center gap-3">
                 <span
-                  className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: DAMAGE_COLORS[det.damage_type] ?? '#6b7280' }}
+                  className="w-2.5 h-2.5 rounded-full flex-shrink-0 shadow-inner"
+                  style={{ backgroundColor: SEVERITY_COLORS[dec.severity_score] ?? '#94a3b8' }}
                 />
-                <span className="text-sm text-slate-200">{det.part}</span>
-                <span className="text-xs text-slate-500">{det.damage_type}</span>
+                <span className="text-[13px] font-bold text-gray-200">{dec.part}</span>
+                <div className="flex flex-col gap-0.5 ml-2">
+                  <span className="text-[11px] text-gray-500">
+                    Coordinates: ({dec.x_percentage.toFixed(1)}%, {dec.y_percentage.toFixed(1)}%)
+                  </span>
+                </div>
               </div>
-              <span className="text-xs font-mono text-slate-400">
-                {(det.confidence * 100).toFixed(0)}%
+              <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded border ${dec.decision === 'REPLACE'
+                ? 'bg-rose-900/30 text-rose-400 border-rose-500/30'
+                : 'bg-emerald-900/30 text-emerald-400 border-emerald-500/30'
+                }`}>
+                {dec.decision}
               </span>
             </div>
           ))}
         </div>
       )}
-    </div>
+    </motion.div>
   )
 }

@@ -2,7 +2,7 @@
 
 export type DamageType = 'Dent' | 'Scratch' | 'Crack' | 'Deformation' | 'Paint Damage' | 'Unknown'
 export type RepairDecision = 'REPAIR' | 'REPLACE'
-export type ApprovalStatus = 'AUTO_APPROVE' | 'MANUAL_REVIEW'
+export type ApprovalStatus = 'AUTO_APPROVE' | 'MANUAL_REVIEW' | 'DECLINED'
 export type VehicleClass = 'hatchback' | 'sedan' | 'suv' | 'luxury'
 export type WorkshopType = 'independent' | 'showroom'
 export type PricingMode = 'oem' | 'aftermarket'
@@ -30,28 +30,15 @@ export interface PerceptionResult {
   heatmap_path?: string
 }
 
-export interface Detection {
-  part: string
-  part_key: string
-  damage_type: DamageType
-  bbox: [number, number, number, number]
-  confidence: number
-  area_px: number
-}
-
-export interface DetectionResult {
-  detections: Detection[]
-  model_used: string
-  image_shape: [number, number]
-}
-
 export interface PartDecision {
   part: string
   part_key: string
   decision: RepairDecision
   severity_score: number
   justification: string
-  damage_type: DamageType
+  damage_type?: DamageType
+  x_percentage: number
+  y_percentage: number
 }
 
 export interface LLMResult {
@@ -93,7 +80,6 @@ export interface ClaimAnalysisResponse {
   claim_id: string
   status: string
   perception: PerceptionResult
-  detections: DetectionResult
   repair_decisions: LLMResult
   estimate: EstimateResult
   heatmap_url?: string

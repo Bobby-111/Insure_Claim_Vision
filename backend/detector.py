@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 YOLO_MODEL_PATH = os.getenv("YOLO_MODEL_PATH", "yolov8n-seg.pt")
-CONF_THRESHOLD = float(os.getenv("YOLO_CONF_THRESHOLD", "0.45"))
+CONF_THRESHOLD = float(os.getenv("YOLO_CONF_THRESHOLD", "0.15"))
 
 # COCO class IDs that indicate a vehicle is present
 VEHICLE_CLASS_IDS = {2, 5, 7}  # car, bus, truck

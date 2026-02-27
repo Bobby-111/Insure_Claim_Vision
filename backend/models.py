@@ -84,23 +84,7 @@ class PerceptionResult(BaseModel):
     heatmap_path: Optional[str] = None
 
 
-# ── Detection Engine Outputs ──────────────────────────────────────────────────
-
-class Detection(BaseModel):
-    part: str = Field(..., description="Vehicle part label")
-    part_key: str = Field(..., description="Normalized part key e.g. front_bumper")
-    damage_type: DamageType
-    bbox: List[int] = Field(..., description="[x1, y1, x2, y2] in pixels")
-    confidence: float = Field(..., ge=0.0, le=1.0)
-    area_px: int
-
-
-class DetectionResult(BaseModel):
-    model_config = {"protected_namespaces": ()}
-    detections: List[Detection]
-    model_used: str
-    image_shape: List[int]
-
+# ── Detection Engine Outputs (Removed - Replaced by LLM) ─────────────────────
 
 # ── LLM Agent Outputs ─────────────────────────────────────────────────────────
 
@@ -110,7 +94,8 @@ class PartDecision(BaseModel):
     decision: RepairDecision
     severity_score: int = Field(..., ge=1, le=6, description="1=minor, 6=total loss")
     justification: str = Field(..., max_length=200)
-    damage_type: DamageType
+    x_percentage: float = Field(0.0, ge=0.0, le=100.0)
+    y_percentage: float = Field(0.0, ge=0.0, le=100.0)
 
 
 class LLMResult(BaseModel):
@@ -157,7 +142,6 @@ class ClaimAnalysisResponse(BaseModel):
     claim_id: str
     status: str
     perception: PerceptionResult
-    detections: DetectionResult
     repair_decisions: LLMResult
     estimate: EstimateResult
     heatmap_url: Optional[str] = None

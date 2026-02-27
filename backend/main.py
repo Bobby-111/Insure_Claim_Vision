@@ -31,7 +31,6 @@ load_dotenv()
 
 import cv_processor
 import database
-import detector
 import llm_agent
 import pricing_service
 from models import (
@@ -121,10 +120,9 @@ async def analyze_claim(
     Full pipeline:
       1. Validate + decode images
       2. CV Processor (normalize, denoise, enhance, POI, heatmap)
-      3. YOLOv8 Detection (parts + damage types)
-      4. Gemini LLM Reasoning (REPAIR / REPLACE + severity)
-      5. Pricing Engine (deterministic cost lookup + GST + pre-approval)
-      6. Persist to DB and return response
+      3. Gemini LLM Reasoning (REPAIR / REPLACE + severity + coords)
+      4. Pricing Engine (deterministic cost lookup + GST + pre-approval)
+      5. Persist to DB and return response
     """
     t_start = time.time()
     claim_id = f"CLM-{time.strftime('%Y%m%d')}-{str(uuid.uuid4())[:6].upper()}-HYD"
@@ -186,58 +184,30 @@ async def analyze_claim(
         )
 
     # ══════════════════════════════════════════════════════════════════════════
-    # LAYER 2: YOLOv8 Detection
-    # ══════════════════════════════════════════════════════════════════════════
-    logger.info(f"[{claim_id}] Layer 2: YOLO Detection ({len(images_bytes)} images)")
-    try:
-        detection_result = detector.detect_damage(primary_bytes, perception)
-
-        # If multiple images: run detection on each and merge detections
-        if len(images_bytes) > 1:
-            for extra_bytes in images_bytes[1:]:
-                try:
-                    extra_perc = cv_processor.process_image(
-                        extra_bytes, heatmap_dir=HEATMAP_DIR, claim_id=f"{claim_id}-x"
-                    )
-                    extra_det = detector.detect_damage(extra_bytes, extra_perc)
-                    # Merge: add any parts not yet in primary detection
-                    existing_keys = {d.part_key for d in detection_result.detections}
-                    for det in extra_det.detections:
-                        if det.part_key not in existing_keys:
-                            detection_result.detections.append(det)
-                            existing_keys.add(det.part_key)
-                except Exception as e:
-                    logger.warning(f"[{claim_id}] Extra image processing failed: {e}")
-
-    except Exception as exc:
-        logger.error(f"[{claim_id}] Detection failed: {exc}")
-        raise HTTPException(status_code=500, detail=f"Detection engine failed: {exc}")
-
-    if not detection_result.detections:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                "No damage detected in the uploaded image(s). "
-                "Please upload clearer exterior vehicle photos."
-            ),
-        )
-
-    # ══════════════════════════════════════════════════════════════════════════
     # LAYER 3: LLM Reasoning Agent
     # ══════════════════════════════════════════════════════════════════════════
-    logger.info(f"[{claim_id}] Layer 3: LLM Reasoning ({len(detection_result.detections)} parts)")
+    logger.info(f"[{claim_id}] Layer 3: LLM Reasoning")
     try:
-        llm_result = llm_agent.reason_repairs(
-            detection_result.detections, perception
-        )
-        if llm_result.model_used == "heuristic-fallback":
-            errors.append(
-                "LLM API unavailable — repair decisions based on CV heuristics. "
-                "Configure GEMINI_API_KEY for full AI reasoning."
-            )
+        llm_result = llm_agent.reason_repairs(perception)
     except Exception as exc:
         logger.error(f"[{claim_id}] LLM Agent failed: {exc}")
         raise HTTPException(status_code=503, detail=f"LLM reasoning failed: {exc}")
+
+    # ── Refine Heatmap with AI Context ────────────────────────────────────────
+    # Now that we have precise AI detections, we filter the heatmap to only 
+    # show gradient intensity near verified damage points.
+    logger.info(f"[{claim_id}] Refining heatmap with AI coordinates")
+    mask_points = [(d.x_percentage, d.y_percentage) for d in llm_result.decisions]
+    try:
+        refined_path = cv_processor.generate_refined_heatmap(
+            primary_bytes,
+            mask_points=mask_points,
+            heatmap_dir=HEATMAP_DIR,
+            claim_id=claim_id,
+        )
+        perception.heatmap_path = refined_path
+    except Exception as exc:
+        logger.warning(f"[{claim_id}] Heatmap refinement failed: {exc}")
 
     # ══════════════════════════════════════════════════════════════════════════
     # LAYER 4: Pricing Engine
@@ -272,7 +242,6 @@ async def analyze_claim(
         claim_id=claim_id,
         status="success",
         perception=perception,
-        detections=detection_result,
         repair_decisions=llm_result,
         estimate=estimate,
         heatmap_url=heatmap_url,

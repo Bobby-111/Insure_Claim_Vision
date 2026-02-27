@@ -29,6 +29,7 @@ frontend/.env.local
 # OS
 .DS_Store
 Thumbs.db
+*.log
 
 # IDE
 .vscode/settings.json

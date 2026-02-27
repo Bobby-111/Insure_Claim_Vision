@@ -2,6 +2,8 @@
 
 import React, { useCallback, useState } from 'react'
 import { useDropzone } from 'react-dropzone'
+import { Camera, UploadCloud, Target, X, Car, Wrench, Tag, Building2, Image as ImageIcon } from 'lucide-react'
+import { motion, AnimatePresence } from 'framer-motion'
 import type { AnalyzeFormData, PricingMode, VehicleClass, WorkshopType } from '../types/claim'
 
 interface Props {
@@ -54,120 +56,155 @@ export default function ImageUploader({ onSubmit, loading }: Props) {
   }
 
   return (
-    <div className="glass-card-elevated p-6 animate-fade-in">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center text-blue-400 text-xl">
-          📷
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -5, scale: 1.01 }}
+      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      className="bg-gray-800/40 border border-gray-700 h-full p-6 sm:p-8 backdrop-blur-3xl transition-shadow duration-300 hover:shadow-glow-lg hover:border-blue-500/40 flex flex-col rounded-3xl"
+    >
+      <div className="flex items-center gap-4 mb-8 relative z-10">
+        <div className="w-14 h-14 rounded-2xl bg-gray-900 border border-gray-700 flex items-center justify-center text-blue-400 shadow-lg">
+          <Camera className="w-7 h-7" />
         </div>
         <div>
-          <h2 className="font-semibold text-lg text-white">Upload Damage Images</h2>
-          <p className="text-sm text-slate-400">Up to 6 exterior vehicle photos</p>
+          <h2 className="font-extrabold text-2xl tracking-tighter text-white">Vehicle Imagery</h2>
+          <p className="text-[11px] font-bold text-gray-500 mt-1 uppercase tracking-widest">Maximum 6 exterior photos</p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
-        {/* Drop Zone */}
+
+      <form onSubmit={handleSubmit} className="flex-1 flex flex-col space-y-6">
+        {/* Drop Zone - now flexible to fill height */}
         <div
           {...getRootProps()}
           className={`
-            relative border-2 border-dashed rounded-xl p-8 text-center cursor-pointer
-            transition-all duration-300
+            relative z-10 flex-1 flex flex-col items-center justify-center border-[3px] border-dashed rounded-[2.5rem] p-10 text-center cursor-pointer
+            transition-all duration-500 ease-out group overflow-hidden bg-gray-900/40 backdrop-blur-sm min-h-[220px]
             ${isDragActive
-              ? 'border-blue-400 bg-blue-500/10 scale-[1.01]'
-              : 'border-white/20 hover:border-blue-400/60 hover:bg-white/5'
+              ? 'border-blue-500 bg-blue-500/10 scale-[1.01] shadow-glow-lg'
+              : 'border-gray-700 hover:border-blue-500 hover:bg-gray-800/80 hover:shadow-glow'
             }
-            ${loading ? 'opacity-50 cursor-not-allowed' : ''}
+            ${loading ? 'opacity-50 cursor-not-allowed filter grayscale' : ''}
           `}
         >
           <input {...getInputProps()} />
-          <div className="flex flex-col items-center gap-3">
-            <div className="text-4xl">
-              {isDragActive ? '🎯' : '☁️'}
-            </div>
+          <div className="flex flex-col items-center gap-4">
+            <motion.div
+              animate={{
+                y: isDragActive ? -8 : 0,
+                scale: isDragActive ? 1.05 : 1
+              }}
+              transition={{ duration: 0.3, type: 'spring' }}
+              className={`p-5 rounded-full shadow-sm ${isDragActive ? 'bg-white text-accent-blue shadow-glow' : 'bg-white text-slate-400 group-hover:text-accent-blue'
+                }`}
+            >
+              {isDragActive ? <Target className="w-10 h-10" /> : <UploadCloud className="w-10 h-10" />}
+            </motion.div>
             <div>
-              <p className="text-slate-300 font-medium">
-                {isDragActive
-                  ? 'Drop images here'
-                  : 'Drag & drop vehicle damage photos'
-                }
+              <p className="text-white font-extrabold text-lg tracking-tight">
+                {isDragActive ? 'Drop images here' : 'Drop damage photos'}
               </p>
-              <p className="text-slate-500 text-sm mt-1">
-                or <span className="text-blue-400 underline">browse files</span> · JPG, PNG, WebP · max 6 images
+              <p className="text-gray-400 text-[13px] mt-1 font-medium">
+                or <span className="text-blue-400 hover:underline decoration-blue-500/30 underline-offset-4">browse your device</span>
               </p>
             </div>
           </div>
         </div>
 
         {/* Image Previews */}
-        {files.length > 0 && (
-          <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-            {files.map((f, idx) => (
-              <div key={idx} className="relative group aspect-square rounded-lg overflow-hidden bg-dark-700">
-                <img
-                  src={URL.createObjectURL(f)}
-                  alt={f.name}
-                  className="w-full h-full object-cover"
-                />
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <button
-                    type="button"
-                    onClick={() => removeFile(idx)}
-                    className="text-white text-2xl hover:text-red-400 transition-colors"
-                    title="Remove"
-                  >
-                    ✕
-                  </button>
+        <AnimatePresence>
+          {files.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="grid grid-cols-3 sm:grid-cols-6 gap-3"
+            >
+              {files.map((f, idx) => (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ delay: idx * 0.05 }}
+                  key={`${f.name}-${idx}`}
+                  className="relative group aspect-square rounded-xl overflow-hidden bg-slate-100 border border-slate-200 shadow-sm"
+                >
+                  <img
+                    src={URL.createObjectURL(f)}
+                    alt={f.name}
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  />
+                  <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center backdrop-blur-[2px]">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); removeFile(idx); }}
+                      className="p-1.5 bg-white/20 hover:bg-red-500 text-white rounded-full transition-colors duration-200"
+                      title="Remove"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                </motion.div>
+              ))}
+              {files.length < 6 && (
+                <div
+                  {...getRootProps()}
+                  className="aspect-square rounded-xl border-2 border-dashed border-slate-200 hover:border-accent-blue/50 hover:bg-slate-50 flex items-center justify-center cursor-pointer transition-colors"
+                >
+                  <ImageIcon className="w-6 h-6 text-slate-300" />
                 </div>
-                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 p-1">
-                  <p className="text-xs text-slate-300 truncate">{f.name}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Form Controls */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Vehicle Class */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-              Vehicle Class
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-5 py-6 border-t border-slate-100/60 mt-auto">
+          {/* Vehicle Class/Make Grid row */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5 ml-1">
+              <Car className="w-3 h-3" /> Vehicle Class
             </label>
-            <select
-              value={vehicleClass}
-              onChange={(e) => setVehicleClass(e.target.value as VehicleClass)}
-              disabled={loading}
-              className="w-full bg-dark-700 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white
-                         focus:outline-none focus:border-blue-400/60 transition-colors"
-            >
-              {VEHICLE_CLASSES.map((c) => (
-                <option key={c.value} value={c.value}>{c.label}</option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={vehicleClass}
+                onChange={(e) => setVehicleClass(e.target.value as VehicleClass)}
+                disabled={loading}
+                className="w-full bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-3 text-[13px] font-bold text-white
+                           focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-gray-800 transition-all appearance-none"
+              >
+                {VEHICLE_CLASSES.map((c) => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
+              <div className="absolute inset-y-0 right-4 flex items-center pointer-events-none text-gray-500">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
+              </div>
+            </div>
           </div>
 
-          {/* Vehicle Make */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-              Vehicle Make <span className="text-slate-600">(optional)</span>
+          <div className="space-y-2">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5 ml-1">
+              <Tag className="w-3 h-3" /> Vehicle Make
             </label>
             <input
               type="text"
               value={vehicleMake}
               onChange={(e) => setVehicleMake(e.target.value)}
-              placeholder="e.g. Maruti, Hyundai, Honda"
+              placeholder="e.g. BMW, Audi"
               disabled={loading}
-              className="w-full bg-dark-700 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white
-                         placeholder-slate-600 focus:outline-none focus:border-blue-400/60 transition-colors"
+              className="w-full bg-gray-900/50 border border-gray-700 rounded-xl px-4 py-3 text-[13px] font-bold text-white
+                         placeholder-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-gray-800 transition-all"
             />
           </div>
 
-          {/* Workshop Type */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-              Workshop Type
+          {/* Workshop Selection */}
+          <div className="space-y-2 sm:col-span-2">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5 ml-1">
+              <Building2 className="w-3 h-3" /> Preferred Workshop
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex bg-gray-900 p-1.5 rounded-2xl border border-gray-700">
               {(['independent', 'showroom'] as WorkshopType[]).map((t) => (
                 <button
                   key={t}
@@ -175,25 +212,26 @@ export default function ImageUploader({ onSubmit, loading }: Props) {
                   onClick={() => setWorkshopType(t)}
                   disabled={loading}
                   className={`
-                    py-2.5 rounded-xl text-sm font-medium border transition-all
+                    flex-1 py-2.5 px-3 rounded-xl text-[12px] font-bold transition-all flex items-center justify-center gap-2
                     ${workshopType === t
-                      ? 'bg-blue-500/20 border-blue-400/60 text-blue-300'
-                      : 'bg-dark-700 border-white/10 text-slate-400 hover:border-white/20'
+                      ? 'bg-gray-800 text-white shadow-sm border border-gray-600'
+                      : 'text-gray-500 hover:text-gray-400 hover:bg-gray-800/50'
                     }
                   `}
                 >
-                  {t === 'independent' ? '🔧 Independent' : '🏢 Showroom'}
+                  {t === 'independent' ? <Wrench className="w-3.5 h-3.5" /> : <Building2 className="w-3.5 h-3.5" />}
+                  {t === 'independent' ? 'Independent' : 'Showroom'}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Pricing Mode */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-              Parts Pricing
+          {/* Pricing Model */}
+          <div className="space-y-2 sm:col-span-2">
+            <label className="text-[10px] font-bold text-gray-500 uppercase tracking-widest flex items-center gap-1.5 ml-1">
+              <Tag className="w-3 h-3" /> Pricing Logic
             </label>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex bg-gray-900 p-1.5 rounded-2xl border border-gray-700">
               {(['aftermarket', 'oem'] as PricingMode[]).map((m) => (
                 <button
                   key={m}
@@ -201,14 +239,14 @@ export default function ImageUploader({ onSubmit, loading }: Props) {
                   onClick={() => setPricingMode(m)}
                   disabled={loading}
                   className={`
-                    py-2.5 rounded-xl text-sm font-medium border transition-all
+                    flex-1 py-2.5 px-3 rounded-xl text-[12px] font-bold transition-all flex items-center justify-center gap-2
                     ${pricingMode === m
-                      ? 'bg-purple-500/20 border-purple-400/60 text-purple-300'
-                      : 'bg-dark-700 border-white/10 text-slate-400 hover:border-white/20'
+                      ? 'bg-gray-800 text-white shadow-sm border border-gray-600'
+                      : 'text-gray-500 hover:text-gray-400 hover:bg-gray-800/50'
                     }
                   `}
                 >
-                  {m === 'aftermarket' ? '💰 Aftermarket' : '🏷 OEM'}
+                  {m === 'aftermarket' ? 'Aftermarket' : 'Official OEM'}
                 </button>
               ))}
             </div>
@@ -216,29 +254,34 @@ export default function ImageUploader({ onSubmit, loading }: Props) {
         </div>
 
         {/* Submit */}
-        <button
+        <motion.button
+          whileHover={files.length > 0 && !loading ? { scale: 1.01 } : {}}
+          whileTap={files.length > 0 && !loading ? { scale: 0.99 } : {}}
           type="submit"
           disabled={loading || files.length === 0}
           className={`
-            w-full py-3.5 rounded-xl font-semibold text-sm transition-all duration-200
+            w-full py-4 rounded-xl font-extrabold text-[15px] transition-all duration-300 flex items-center justify-center gap-2.5 mt-4 group
             ${files.length > 0 && !loading
-              ? 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.01]'
-              : 'bg-dark-700 text-slate-600 cursor-not-allowed'
+              ? 'bg-gradient-to-r from-accent-blue to-accent-cyan hover:from-blue-600 hover:to-cyan-600 text-white shadow-glow'
+              : 'bg-white/50 text-slate-400 cursor-not-allowed border border-white'
             }
           `}
         >
           {loading ? (
-            <span className="flex items-center justify-center gap-2">
-              <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+            <>
+              <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeDasharray="30 70" />
               </svg>
-              Analysing...
-            </span>
+              Starting Engine...
+            </>
           ) : (
-            `⚡ Run AI Claim Analysis${files.length > 0 ? ` (${files.length} image${files.length > 1 ? 's' : ''})` : ''}`
+            <>
+              Generate Estimate
+              {files.length > 0 && <span className="bg-green-600 px-2 py-0.5 rounded-full text-xs ml-1">{files.length}</span>}
+            </>
           )}
-        </button>
+        </motion.button>
       </form>
-    </div>
+    </motion.div >
   )
 }

@@ -109,6 +109,38 @@ def process_image(
     )
 
 
+def generate_refined_heatmap(
+    image_bytes: bytes,
+    mask_points: list[tuple[float, float]],
+    heatmap_dir: str,
+    claim_id: str,
+) -> str:
+    """
+    Generate a heatmap restricted only to regions verified by AI detection points.
+    Entries in mask_points are (x_percentage, y_percentage).
+    """
+    nparr = np.frombuffer(image_bytes, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    img = _normalize(img)
+    img = cv2.GaussianBlur(img, GAUSSIAN_KERNEL, 0)
+    img = _apply_clahe(img)
+
+    h, w = img.shape[:2]
+    mask = np.zeros((h, w), dtype=np.uint8)
+
+    # Create a circular mask for each detection point
+    for x_pct, y_pct in mask_points:
+        cx, cy = int(x_pct * w / 100), int(y_pct * h / 100)
+        # 120px radius for damage focus
+        cv2.circle(mask, (cx, cy), 120, 255, -1)
+
+    # Smooth the mask edges
+    mask = cv2.GaussianBlur(mask, (51, 51), 0)
+
+    # Use existing generator with the mask
+    return _generate_heatmap(img, None, heatmap_dir, claim_id, mask=mask)
+
+
 # ── Private Helpers ───────────────────────────────────────────────────────────
 
 def _normalize(img: np.ndarray) -> np.ndarray:
@@ -253,13 +285,14 @@ def _clock_dial_poi(
 
 def _generate_heatmap(
     img: np.ndarray,
-    edges: np.ndarray,
+    edges: np.ndarray | None,
     heatmap_dir: str,
     claim_id: str,
+    mask: np.ndarray | None = None,
 ) -> str:
     """
     Produce a JET colormap overlay of the gradient magnitude onto the image.
-    Saves to heatmap_dir/<claim_id>_heatmap.png and returns the path.
+    If mask is provided, the magnitude is gated by the mask.
     """
     Path(heatmap_dir).mkdir(parents=True, exist_ok=True)
 
@@ -269,6 +302,12 @@ def _generate_heatmap(
     grad_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=3)
     magnitude = np.sqrt(grad_x**2 + grad_y**2)
     magnitude = np.uint8(255 * magnitude / (magnitude.max() + 1e-6))
+
+    # Apply AI Mask if available
+    if mask is not None:
+        # Normalize mask to 0-1 and multiply
+        mask_norm = mask.astype(np.float32) / 255.0
+        magnitude = (magnitude.astype(np.float32) * mask_norm).astype(np.uint8)
 
     # Apply Gaussian smoothing for smooth heatmap blobs
     magnitude_smooth = cv2.GaussianBlur(magnitude, (21, 21), 0)
@@ -280,21 +319,22 @@ def _generate_heatmap(
     alpha = 0.45
     overlay = cv2.addWeighted(img, 1 - alpha, heatmap_colored, alpha, 0)
 
-    # Draw damage region bounding boxes on overlay
-    damage_regions = _extract_damage_regions(edges)
-    for region in damage_regions[:5]:
-        x1, y1, x2, y2 = region.bounding_box
-        cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 255, 255), 2)
-        cv2.putText(
-            overlay,
-            f"Region {region.region_id}",
-            (x1, max(y1 - 6, 10)),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.5,
-            (0, 255, 255),
-            1,
-            cv2.LINE_AA,
-        )
+    # Draw damage region bounding boxes on overlay if edges provided
+    if edges is not None:
+        damage_regions = _extract_damage_regions(edges)
+        for region in damage_regions[:5]:
+            x1, y1, x2, y2 = region.bounding_box
+            cv2.rectangle(overlay, (x1, y1), (x2, y2), (0, 255, 255), 2)
+            cv2.putText(
+                overlay,
+                f"Region {region.region_id}",
+                (x1, max(y1 - 6, 10)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.5,
+                (0, 255, 255),
+                1,
+                cv2.LINE_AA,
+            )
 
     filename = f"{claim_id}_heatmap.png"
     filepath = os.path.join(heatmap_dir, filename)
