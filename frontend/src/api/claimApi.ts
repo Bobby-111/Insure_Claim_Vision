@@ -4,7 +4,7 @@ import axios from 'axios'
 import type { AnalyzeFormData, ClaimAnalysisResponse } from '../types/claim'
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   timeout: 120_000, // 2 minutes — YOLO + Gemini can be slow
 })
 
