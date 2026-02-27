@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  body {
+    @apply bg-dark-900 text-slate-100 font-sans antialiased;
+    background-image:
+      radial-gradient(ellipse at 20% 20%, rgba(59, 130, 246, 0.08) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 80%, rgba(139, 92, 246, 0.06) 0%, transparent 50%);
+    background-attachment: fixed;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-dark-800;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-dark-600 rounded-full;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl;
+  }
+
+  .glass-card-elevated {
+    @apply bg-white/[0.07] backdrop-blur-xl border border-white/[0.15] rounded-2xl shadow-2xl;
+  }
+
+  .gradient-border {
+    background: linear-gradient(135deg, rgba(59,130,246,0.4), rgba(139,92,246,0.4));
+    padding: 1px;
+    border-radius: 16px;
+  }
+
+  .gradient-border-inner {
+    @apply bg-dark-800 rounded-[15px];
+  }
+
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      rgba(255,255,255,0.03) 0%,
+      rgba(255,255,255,0.08) 50%,
+      rgba(255,255,255,0.03) 100%
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer;
+  }
+
+  .badge-approve {
+    @apply inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold
+           bg-emerald-500/20 text-emerald-400 border border-emerald-500/30;
+  }
+
+  .badge-review {
+    @apply inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm font-semibold
+           bg-amber-500/20 text-amber-400 border border-amber-500/30;
+  }
+
+  .stat-card {
+    @apply glass-card p-4 flex flex-col gap-1;
+  }
+
+  .layer-step {
+    @apply flex items-center gap-3 py-2;
+  }
+
+  .layer-step-active {
+    @apply layer-step text-blue-400;
+  }
+
+  .layer-step-done {
+    @apply layer-step text-emerald-400;
+  }
+
+  .layer-step-pending {
+    @apply layer-step text-slate-500;
+  }
+}

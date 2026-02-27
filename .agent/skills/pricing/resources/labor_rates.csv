@@ -1,0 +1,12 @@
+operation,operation_label,workshop_inr,showroom_min_inr,showroom_max_inr,notes
+repair_panel,Panel Repair (Dent/Scratch),2799,4500,6000,Per panel — paint blending included
+repair_crack,Crack Repair,3200,5200,7000,Includes filler and refinish
+replace_bumper,Bumper Replacement,1500,2500,3500,Labor to remove fit and finish
+replace_hood,Hood Replacement,1800,3000,4000,Alignment + hinge adjustment included
+replace_door,Door Replacement,2200,3800,5200,Includes alignment and seal fitting
+replace_lamp,Lamp / Light Replacement,800,1400,2000,Electrical connection and aim adjustment
+replace_fender,Fender Replacement,1600,2800,3800,Includes panel alignment
+replace_windshield,Windshield Replacement,1200,2200,3000,Includes ADAS recalibration if required
+replace_panel,Generic Panel Replacement,1500,2500,3500,Default labor for unlisted parts
+painting_base,Base Painting (per panel),1800,3200,4500,Single-stage enamel
+painting_metallic,Metallic / Pearl Painting,2400,4200,6000,Two-stage process

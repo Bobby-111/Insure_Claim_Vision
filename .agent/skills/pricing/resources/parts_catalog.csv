@@ -1,0 +1,73 @@
+vehicle_class,part_name,part_label,oem_cost_inr,aftermarket_cost_inr
+hatchback,front_bumper,Front Bumper,8290,5500
+hatchback,rear_bumper,Rear Bumper,7800,5200
+hatchback,hood,Hood,12000,8500
+hatchback,headlamp_left,Headlamp (Left),4500,2800
+hatchback,headlamp_right,Headlamp (Right),4500,2800
+hatchback,tail_lamp_left,Tail Lamp (Left),3200,1900
+hatchback,tail_lamp_right,Tail Lamp (Right),3200,1900
+hatchback,fender_left,Fender (Left),6800,4200
+hatchback,fender_right,Fender (Right),6800,4200
+hatchback,door_front_left,Front Door (Left),18000,12000
+hatchback,door_front_right,Front Door (Right),18000,12000
+hatchback,door_rear_left,Rear Door (Left),16500,11000
+hatchback,door_rear_right,Rear Door (Right),16500,11000
+hatchback,windshield_front,Windshield (Front),7200,4800
+hatchback,windshield_rear,Windshield (Rear),5500,3600
+hatchback,roof_panel,Roof Panel,22000,16000
+hatchback,quarter_panel_left,Quarter Panel (Left),9500,6500
+hatchback,quarter_panel_right,Quarter Panel (Right),9500,6500
+hatchback,grille,Grille,3800,2200
+hatchback,fog_lamp_left,Fog Lamp (Left),2100,1200
+hatchback,fog_lamp_right,Fog Lamp (Right),2100,1200
+sedan,front_bumper,Front Bumper,11500,7800
+sedan,rear_bumper,Rear Bumper,10800,7200
+sedan,hood,Hood,16500,11500
+sedan,headlamp_left,Headlamp (Left),7200,4800
+sedan,headlamp_right,Headlamp (Right),7200,4800
+sedan,tail_lamp_left,Tail Lamp (Left),5800,3600
+sedan,tail_lamp_right,Tail Lamp (Right),5800,3600
+sedan,fender_left,Fender (Left),9200,6200
+sedan,fender_right,Fender (Right),9200,6200
+sedan,door_front_left,Front Door (Left),24000,16500
+sedan,door_front_right,Front Door (Right),24000,16500
+sedan,door_rear_left,Rear Door (Left),22000,15000
+sedan,door_rear_right,Rear Door (Right),22000,15000
+sedan,windshield_front,Windshield (Front),9800,6500
+sedan,windshield_rear,Windshield (Rear),7500,5000
+sedan,roof_panel,Roof Panel,28000,20000
+sedan,quarter_panel_left,Quarter Panel (Left),13500,9000
+sedan,quarter_panel_right,Quarter Panel (Right),13500,9000
+sedan,grille,Grille,5200,3200
+suv,front_bumper,Front Bumper,18500,13000
+suv,rear_bumper,Rear Bumper,17200,12000
+suv,hood,Hood,24000,17000
+suv,headlamp_left,Headlamp (Left),12000,8200
+suv,headlamp_right,Headlamp (Right),12000,8200
+suv,tail_lamp_left,Tail Lamp (Left),8500,5800
+suv,tail_lamp_right,Tail Lamp (Right),8500,5800
+suv,fender_left,Fender (Left),14500,10000
+suv,fender_right,Fender (Right),14500,10000
+suv,door_front_left,Front Door (Left),32000,22000
+suv,door_front_right,Front Door (Right),32000,22000
+suv,door_rear_left,Rear Door (Left),29000,20000
+suv,door_rear_right,Rear Door (Right),29000,20000
+suv,windshield_front,Windshield (Front),14500,9800
+suv,windshield_rear,Windshield (Rear),11000,7500
+suv,roof_panel,Roof Panel,38000,28000
+suv,quarter_panel_left,Quarter Panel (Left),19000,13500
+suv,quarter_panel_right,Quarter Panel (Right),19000,13500
+suv,grille,Grille,8500,5800
+luxury,front_bumper,Front Bumper,42000,28000
+luxury,rear_bumper,Rear Bumper,38000,26000
+luxury,hood,Hood,65000,45000
+luxury,headlamp_left,Headlamp (Left),45000,30000
+luxury,headlamp_right,Headlamp (Right),45000,30000
+luxury,fender_left,Fender (Left),32000,22000
+luxury,fender_right,Fender (Right),32000,22000
+luxury,door_front_left,Front Door (Left),78000,55000
+luxury,door_front_right,Front Door (Right),78000,55000
+luxury,door_rear_left,Rear Door (Left),72000,50000
+luxury,door_rear_right,Rear Door (Right),72000,50000
+luxury,windshield_front,Windshield (Front),38000,26000
+luxury,roof_panel,Roof Panel,95000,68000
