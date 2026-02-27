@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 GEMINI_MODEL = "gemini-2.5-flash"
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "AIzaSyBKy1ndo0KGBP-g3hgCHwzqnrqJyrlPNy0")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", API_KEY)
 
 # Severity threshold above which REPLACE is mandated regardless of LLM
 SEVERITY_REPLACE_THRESHOLD = 4
